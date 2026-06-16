@@ -42,14 +42,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build
-          path: dist
+          path: dist   # download directly into dist
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-<<<<<<< HEAD
-          publish_dir: ./dist
-=======
-          publish_dir: ./build/dist
->>>>>>> origin/main
+          publish_dir: ./dist   # publish from dist

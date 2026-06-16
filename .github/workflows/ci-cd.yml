@@ -27,18 +27,8 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 👇 Run different build scripts depending on branch
-      - name: Run build (DEV)
-        if: github.ref == 'refs/heads/dev'
-        run: npm run build:dev
-
-      - name: Run build (UAT)
-        if: github.ref == 'refs/heads/uat'
-        run: npm run build:uat
-
-      - name: Run build (PROD)
-        if: github.ref == 'refs/heads/main'
-        run: npm run build:prod
+      - name: Run build
+        run: npm run build
 
       - name: Upload production build
         uses: actions/upload-artifact@v4
@@ -46,9 +36,10 @@ jobs:
           name: build
           path: dist
 
-  deploy:
+  deploy-dev:
     needs: build
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
 
     steps:
       - name: Download build
@@ -57,7 +48,45 @@ jobs:
           name: build
           path: dist
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (DEV)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: dev   # 👈 deploys into /dev subfolder
+
+  deploy-uat:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/uat'
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - name: Deploy to GitHub Pages (UAT)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: uat   # 👈 deploys into /uat subfolder
+
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - name: Deploy to GitHub Pages (PROD)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

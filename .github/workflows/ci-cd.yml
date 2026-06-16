@@ -11,7 +11,6 @@ permissions:
   contents: write
 
 jobs:
-  # ── 1. Build ────────────────────────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
 
@@ -23,47 +22,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Set deploy environment
-        id: env
-        run: |
-          BRANCH="${GITHUB_REF##*/}"
-          if   [ "$BRANCH" = "main" ]; then DEPLOY_ENV="prod"
-          elif [ "$BRANCH" = "uat"  ]; then DEPLOY_ENV="uat"
-          else                              DEPLOY_ENV="dev"
-          fi
-          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_OUTPUT
-
       - name: Run build
-        env:
-          VITE_REPO_NAME: ${{ github.event.repository.name }}
-          VITE_DEPLOY_ENV: ${{ steps.env.outputs.DEPLOY_ENV }}
         run: npm run build
 
-      - name: Upload build artifact
+      - name: Upload production build
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ steps.env.outputs.DEPLOY_ENV }}
+          name: build
           path: dist
-          retention-days: 1
 
-  # ── 2. Deploy → DEV ─────────────────────────────────────────────────────────
   deploy-dev:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/dev'
-    environment:
-      name: dev
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev
 
     steps:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-dev
+          name: build
           path: dist
 
       - name: Deploy to GitHub Pages (DEV)
@@ -72,22 +54,17 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: dev
-          commit_message: "deploy(dev): ${{ github.sha }}"
 
-  # ── 3. Deploy → UAT ─────────────────────────────────────────────────────────
   deploy-uat:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/uat'
-    environment:
-      name: uat
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/uat
 
     steps:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-uat
+          name: build
           path: dist
 
       - name: Deploy to GitHub Pages (UAT)
@@ -96,22 +73,17 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           destination_dir: uat
-          commit_message: "deploy(uat): ${{ github.sha }}"
 
-  # ── 4. Deploy → PROD ────────────────────────────────────────────────────────
   deploy-prod:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prod
 
     steps:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: build-prod
+          name: build
           path: dist
 
       - name: Deploy to GitHub Pages (PROD)
@@ -119,5 +91,3 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
-          destination_dir: prod
-          commit_message: "deploy(prod): ${{ github.sha }}"

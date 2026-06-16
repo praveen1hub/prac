@@ -1,0 +1,1 @@
+export const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });

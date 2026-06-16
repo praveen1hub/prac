@@ -2,10 +2,10 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
+    branches:
+      - dev
+      - uat
+      - main
 
 permissions:
   contents: write
@@ -36,7 +36,45 @@ jobs:
           name: build
           path: dist
 
-  deploy:
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - name: Deploy to GitHub Pages (DEV)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: dev   # 👈 deploys into /dev subfolder
+
+  deploy-uat:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/uat'
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: dist
+
+      - name: Deploy to GitHub Pages (UAT)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: uat   # 👈 deploys into /uat subfolder
+
+  deploy-prod:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -46,10 +84,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build
-          path: dist   # download directly into dist
+          path: dist
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (PROD)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist   # publish from dist
+          publish_dir: ./dist

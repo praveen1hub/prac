@@ -1,4 +1,4 @@
-"scripts": {
+"scripts": {  
   "dev": "vite",
   "build:dev": "VITE_ENV=dev vite build",
   "build:uat": "VITE_ENV=uat vite build",

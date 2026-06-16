@@ -1,25 +1,67 @@
-# Ncart React Starter (Vite + Tailwind)
+# Ncart React
 
-This is a starter React implementation of your Ncart site, with search, category filter, price sort, product modal, basic cart drawer, and dark mode.
+A Vite + React + Tailwind shopping app with search, category filter, price sort, product detail page, cart drawer, and dark mode.
 
-## Step 1 — Install
+## Project Structure
+
+```
+ncart/
+├── public/                   # Static assets
+├── src/
+│   ├── components/
+│   │   ├── Navbar.jsx        # Top nav with cart icon & dark toggle
+│   │   ├── ProductCard.jsx   # Grid card with add-to-cart
+│   │   └── CartDrawer.jsx    # Slide-in cart with qty controls
+│   ├── pages/
+│   │   ├── Home.jsx          # Search + filter + product grid
+│   │   └── ProductDetail.jsx # Single product page
+│   ├── App.jsx               # Routes + cart state
+│   ├── main.jsx              # React entry point
+│   └── index.css             # Tailwind directives
+├── .github/workflows/
+│   └── ci-cd.yml             # GitHub Actions: build → deploy dev/uat/prod
+├── Dockerfile                # Multi-stage build (node → nginx, ~25 MB)
+├── docker-compose.yml        # Dev (hot-reload) + Prod (nginx) profiles
+├── nginx.conf                # SPA routing + asset caching
+├── vite.config.js            # Dynamic base path for GitHub Pages
+├── tailwind.config.js
+└── postcss.config.js
+```
+
+## Local Development
+
 ```bash
 npm install
-```
-
-## Step 2 — Run in Dev
-```bash
 npm run dev
 ```
-Then open the printed local URL in your browser.
 
-## Step 3 — Build for Production
+## Docker
+
 ```bash
-npm run build
-npm run preview
+# Hot-reload dev server on :5173
+docker compose --profile dev up
+
+# Production nginx build on :8080
+docker compose --profile prod up --build
 ```
 
-### Notes
-- Tailwind dark mode is enabled (class strategy). Use the sun/moon button to toggle.
-- Products are in `App.jsx` as `initialProducts`. Replace images with your own `/public/img/...` assets or URLs.
-- Next steps we can add React Router (pages), Context API for global cart, and persist cart to localStorage.
+## CI/CD — GitHub Actions
+
+Push to any branch to trigger the pipeline:
+
+| Branch | Environment | URL |
+|--------|-------------|-----|
+| `dev`  | dev  | `https://<you>.github.io/<repo>/dev`  |
+| `uat`  | uat  | `https://<you>.github.io/<repo>/uat`  |
+| `main` | prod | `https://<you>.github.io/<repo>/prod` |
+
+### One-time GitHub setup
+1. Go to **Settings → Pages** → set source to `gh-pages` branch
+2. Go to **Settings → Environments** → create `dev`, `uat`, `production`
+
+## Production Build
+
+```bash
+npm run build   # outputs to dist/
+npm run preview # preview locally
+```

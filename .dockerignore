@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+Dockerfile
+docker-compose*.yml
+nginx.conf

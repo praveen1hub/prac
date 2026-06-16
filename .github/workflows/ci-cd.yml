@@ -1,0 +1,124 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - uat
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 1. Build ────────────────────────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set deploy environment
+        id: env
+        run: |
+          BRANCH="${GITHUB_REF##*/}"
+          if   [ "$BRANCH" = "main" ]; then DEPLOY_ENV="prod"
+          elif [ "$BRANCH" = "uat"  ]; then DEPLOY_ENV="uat"
+          else                              DEPLOY_ENV="dev"
+          fi
+          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_OUTPUT
+
+      - name: Run build
+        env:
+          VITE_REPO_NAME: ${{ github.event.repository.name }}
+          VITE_DEPLOY_ENV: ${{ steps.env.outputs.DEPLOY_ENV }}
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ steps.env.outputs.DEPLOY_ENV }}
+          path: dist
+          retention-days: 1
+
+  # ── 2. Deploy → DEV ─────────────────────────────────────────────────────────
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    environment:
+      name: dev
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dev
+          path: dist
+
+      - name: Deploy to GitHub Pages (DEV)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: dev
+          commit_message: "deploy(dev): ${{ github.sha }}"
+
+  # ── 3. Deploy → UAT ─────────────────────────────────────────────────────────
+  deploy-uat:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/uat'
+    environment:
+      name: uat
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/uat
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-uat
+          path: dist
+
+      - name: Deploy to GitHub Pages (UAT)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: uat
+          commit_message: "deploy(uat): ${{ github.sha }}"
+
+  # ── 4. Deploy → PROD ────────────────────────────────────────────────────────
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prod
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-prod
+          path: dist
+
+      - name: Deploy to GitHub Pages (PROD)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: prod
+          commit_message: "deploy(prod): ${{ github.sha }}"

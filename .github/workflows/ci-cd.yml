@@ -1,113 +1,28 @@
-name: CI/CD Pipeline with Docker
+name: Build and Deploy Vite App
 
 on:
   push:
     branches:
-      - dev
-      - uat
       - main
 
-permissions:
-  contents: write
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v3
 
-      # 🔹 Log in to Docker Hub
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-      # 🔹 Build Docker image
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }} .
-
-      # 🔹 Push Docker image
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }}
-
-      # 🔹 Extract build output from container
-      - name: Extract build output
+      - name: Stop and remove old container
         run: |
-          docker run --rm -v ${{ github.workspace }}/dist:/app/dist ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }}
+          docker stop my-vite-app || true
+          docker rm my-vite-app || true
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4.6.2
-        with:
-          name: build-${{ github.ref_name }}
-          path: dist
-          retention-days: 1
+      - name: Remove old image
+        run: docker rmi my-vite-app || true
 
-  # ── Deploy jobs (same as before, just download artifact and publish) ──
-  deploy-dev:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/dev'
-    environment:
-      name: dev
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev
+      - name: Build Docker image
+        run: docker build -t my-vite-app .
 
-    steps:
-      - name: Download build
-        uses: actions/download-artifact@v4.3.0
-        with:
-          name: build-dev
-          path: dist
-
-      - name: Deploy to GitHub Pages (DEV)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          destination_dir: dev
-          commit_message: "deploy(dev): ${{ github.sha }}"
-
-  deploy-uat:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/uat'
-    environment:
-      name: uat
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/uat
-
-    steps:
-      - name: Download build
-        uses: actions/download-artifact@v4.3.0
-        with:
-          name: build-uat
-          path: dist
-
-      - name: Deploy to GitHub Pages (UAT)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          destination_dir: uat
-          commit_message: "deploy(uat): ${{ github.sha }}"
-
-  deploy-prod:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prod
-
-    steps:
-      - name: Download build
-        uses: actions/download-artifact@v4.3.0
-        with:
-          name: build-main
-          path: dist
-
-      - name: Deploy to GitHub Pages (PROD)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          destination_dir: prod
-          commit_message: "deploy(prod): ${{ github.sha }}"
+      - name: Run new container
+        run: docker run -d --name my-vite-app -p 80:80 my-vite-app

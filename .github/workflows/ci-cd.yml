@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Docker
 
 on:
   push:
@@ -11,7 +11,6 @@ permissions:
   contents: write
 
 jobs:
-  # ── 1. Build ────────────────────────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
 
@@ -19,38 +18,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      # 🔹 Log in to Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
-      - name: Install dependencies
-        run: npm install
+      # 🔹 Build Docker image
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }} .
 
-      - name: Set deploy environment
-        id: env
+      # 🔹 Push Docker image
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }}
+
+      # 🔹 Extract build output from container
+      - name: Extract build output
         run: |
-          BRANCH="${GITHUB_REF##*/}"
-          if   [ "$BRANCH" = "main" ]; then DEPLOY_ENV="prod"
-          elif [ "$BRANCH" = "uat"  ]; then DEPLOY_ENV="uat"
-          else                              DEPLOY_ENV="dev"
-          fi
-          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_OUTPUT
-
-      - name: Run build
-        env:
-          VITE_REPO_NAME: ${{ github.event.repository.name }}
-          VITE_DEPLOY_ENV: ${{ steps.env.outputs.DEPLOY_ENV }}
-        run: npm run build
+          docker run --rm -v ${{ github.workspace }}/dist:/app/dist ${{ secrets.DOCKERHUB_USERNAME }}/my-app:${{ github.sha }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: build-${{ steps.env.outputs.DEPLOY_ENV }}
+          name: build-${{ github.ref_name }}
           path: dist
           retention-days: 1
 
-  # ── 2. Deploy → DEV ─────────────────────────────────────────────────────────
+  # ── Deploy jobs (same as before, just download artifact and publish) ──
   deploy-dev:
     needs: build
     runs-on: ubuntu-latest
@@ -74,7 +66,6 @@ jobs:
           destination_dir: dev
           commit_message: "deploy(dev): ${{ github.sha }}"
 
-  # ── 3. Deploy → UAT ─────────────────────────────────────────────────────────
   deploy-uat:
     needs: build
     runs-on: ubuntu-latest
@@ -98,7 +89,6 @@ jobs:
           destination_dir: uat
           commit_message: "deploy(uat): ${{ github.sha }}"
 
-  # ── 4. Deploy → PROD ────────────────────────────────────────────────────────
   deploy-prod:
     needs: build
     runs-on: ubuntu-latest
@@ -111,7 +101,7 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4.3.0
         with:
-          name: build-prod
+          name: build-main
           path: dist
 
       - name: Deploy to GitHub Pages (PROD)

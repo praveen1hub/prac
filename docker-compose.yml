@@ -1,4 +1,9 @@
 services:
+  vite:
+    build: .
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host
   ncart-dev:
     profiles: [dev]
     image: node:20-alpine

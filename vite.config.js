@@ -10,6 +10,6 @@ export default defineConfig({
       ? `/${repoName}/dev/`
       : env === 'uat'
       ? `/${repoName}/uat/`
-      : `/${repoName}/`,
+      : `/${repoName}/prod/`,
   plugins: [react()],
 })

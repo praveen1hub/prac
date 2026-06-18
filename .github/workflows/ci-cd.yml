@@ -1,28 +1,123 @@
-name: Build and Deploy Vite App
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
+      - dev
+      - uat
       - main
 
+permissions:
+  contents: write
+
 jobs:
-  build-and-deploy:
-    runs-on: self-hosted
+  # ── 1. Build ────────────────────────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
-      - name: Stop and remove old container
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set deploy environment
+        id: env
         run: |
-          docker stop my-vite-app || true
-          docker rm my-vite-app || true
+          BRANCH="${GITHUB_REF##*/}"
+          if   [ "$BRANCH" = "main" ]; then DEPLOY_ENV="prod"
+          elif [ "$BRANCH" = "uat"  ]; then DEPLOY_ENV="uat"
+          else                              DEPLOY_ENV="dev"
+          fi
+          echo "DEPLOY_ENV=$DEPLOY_ENV" >> $GITHUB_OUTPUT
 
-      - name: Remove old image
-        run: docker rmi my-vite-app || true
+      - name: Run build
+        env:
+          VITE_REPO_NAME: ${{ github.event.repository.name }}
+          VITE_DEPLOY_ENV: ${{ steps.env.outputs.DEPLOY_ENV }}
+        run: npm run build
 
-      - name: Build Docker image
-        run: docker build -t my-vite-app .
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: build-${{ steps.env.outputs.DEPLOY_ENV }}
+          path: dist
+          retention-days: 1
 
-      - name: Run new container
-        run: docker run -d --name my-vite-app -p 80:80 my-vite-app
+  # ── 2. Deploy → DEV ─────────────────────────────────────────────────────────
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev'
+    environment:
+      name: dev
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/dev
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: build-dev
+          path: dist
+
+      - name: Deploy to GitHub Pages (DEV)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: dev
+          commit_message: "deploy(dev): ${{ github.sha }}"
+
+  # ── 3. Deploy → UAT ─────────────────────────────────────────────────────────
+  deploy-uat:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/uat'
+    environment:
+      name: uat
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/uat
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: build-uat
+          path: dist
+
+      - name: Deploy to GitHub Pages (UAT)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: uat
+          commit_message: "deploy(uat): ${{ github.sha }}"
+
+  # ── 4. Deploy → PROD ────────────────────────────────────────────────────────
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prod
+
+    steps:
+      - name: Download build
+        uses: actions/download-artifact@v4.3.0
+        with:
+          name: build-prod
+          path: dist
+
+      - name: Deploy to GitHub Pages (PROD)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: prod
+          commit_message: "deploy(prod): ${{ github.sha }}"

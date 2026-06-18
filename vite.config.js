@@ -1,15 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+const repoName = process.env.VITE_REPO_NAME || 'prac'
+const env = process.env.VITE_DEPLOY_ENV || 'prod'
 
-// Dynamically set base path depending on environment
-const env = process.env.VITE_ENV || 'prod'
-
-export default defineConfig({
-  base:
-    env === 'dev'
-      ? '/prac/dev/'
-      : env === 'uat'
-      ? '/prac/uat/'
-      : '/prac/',
-  plugins: [react()],
-})
+base:
+  env === 'dev' ? `/${repoName}/dev/` :
+  env === 'uat' ? `/${repoName}/uat/` :
+  `/${prac}/`
